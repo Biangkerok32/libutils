@@ -53,4 +53,21 @@ public class DisplayUtils {
         float fontScale = context.getResources().getDisplayMetrics().scaledDensity;
         return spValue * fontScale + 0.5f;
     }
+
+    public static float px2dip(float pxValue) {
+        return px2dip(Utils.getApp(), pxValue);
+    }
+
+    public static float dip2px(float dipValue) {
+        return dip2px(Utils.getApp(), dipValue);
+    }
+
+    public static float px2sp(float pxValue) {
+        return px2sp(Utils.getApp(), pxValue);
+    }
+
+    public static float sp2px(float spValue) {
+        return sp2px(Utils.getApp(), spValue);
+    }
+
 }

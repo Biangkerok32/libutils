@@ -3,6 +3,7 @@ package com.snailstudio2010.libutils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +32,18 @@ public class ArrayUtils {
         return map == null || map.size() <= 0;
     }
 
+    public static <T> int size(Collection<T> collection) {
+        return collection == null ? 0 : collection.size();
+    }
+
+    public static <T> int size(T[] array) {
+        return array == null ? 0 : array.length;
+    }
+
+    public static int size(Map map) {
+        return map == null ? 0 : map.size();
+    }
+
     public static String join(CharSequence delimiter, String[] elements) {
         StringBuilder contact = new StringBuilder();
         if (elements != null) {
@@ -40,5 +53,22 @@ public class ArrayUtils {
             }
         }
         return contact.toString();
+    }
+
+    public static <E> void add(Collection<E> collection, E o) {
+        if (collection == null || o == null || collection.contains(o)) return;
+        collection.add(o);
+    }
+
+    public static <E> void add(List<E> collection, int index, E o) {
+        if (collection == null || o == null || collection.contains(o)) return;
+        collection.add(index, o);
+    }
+
+    public static boolean remove(Collection collection, Object o) {
+        if (collection != null && o != null && collection.contains(o)) {
+            return collection.remove(0);
+        }
+        return false;
     }
 }

@@ -1,17 +1,22 @@
 package com.snailstudio2010.libutils;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.AnimationDrawable;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Base64;
-import android.util.Log;
 
-import org.apache.http.util.EncodingUtils;
+import com.snailstudio2010.libutils.code.EncodingUtils;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -22,15 +27,12 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
-import java.util.zip.ZipFile;
 
 /**
  * Created by xuqiqiang on 2016/05/17.
@@ -38,27 +40,25 @@ import java.util.zip.ZipFile;
 public class Cache {
     private static final String TAG = Cache.class.getSimpleName();
     public static String rootName;
-    public static String spName;
-    private static String name;
+
+    @SuppressLint("StaticFieldLeak")
     private static Context context;
-    private static String filename;
     private static SharedPreferences sharedPreferences;
     private static SharedPreferences.Editor editor;
     private FileInputStream fis;
     private DataInputStream dis;
     private FileOutputStream fos;
     private DataOutputStream dos;
+    public static String spName;
 
     private Cache() {
     }
 
     public static void initialize(Context context, String name) {
-        if (Cache.context == null) {
-            Cache.context = context;
-            Cache.name = name;
-            setRootName(name);
-            initSharedPreferences(name);
-        }
+        Cache.context = context.getApplicationContext();
+//        Cache.name = name;
+        setRootName(name);
+        initSharedPreferences(name);
     }
 
     public static Cache getInstance() {
@@ -66,11 +66,14 @@ public class Cache {
     }
 
     public static void initSharedPreferences() {
-        filename = context.getPackageName();
-        initSharedPreferences(filename);
+        String spName = context.getPackageName();
+        initSharedPreferences(spName);
     }
 
     public static void initSharedPreferences(String name) {
+        if (editor != null) {
+            editor.apply();
+        }
         spName = name.replace(File.separator, "_");
         sharedPreferences = context.getSharedPreferences(spName,
                 Activity.MODE_PRIVATE);
@@ -87,13 +90,7 @@ public class Cache {
     }
 
     public static File getFile(String[] dirName, String fileName) {
-        String path = rootName;
-        if (dirName != null) {
-            for (String name : dirName) {
-                path += File.separator + name;
-            }
-        }
-        return new File(path + File.separator + fileName);
+        return new File(getRealFilePath(dirName), fileName);
     }
 
     public static Bitmap readBitmap(String[] cacheName, String fileName) {
@@ -190,26 +187,20 @@ public class Cache {
     }
 
     // byte[] → Bitmap
-    public static Bitmap convertBytes2Bimap(byte[] b) {
-        if (b.length == 0) {
+    public static Bitmap bytes2Bitmap(byte[] b) {
+        if (b == null || b.length == 0) {
             return null;
         }
         return BitmapFactory.decodeByteArray(b, 0, b.length);
     }
 
-    public static Bitmap getImageFromStr(String str) {// 将图片文件转化为字节数组字符串，并对其进行Base64编码处理
-
-        byte[] buffer = Base64.decode(str, Base64.DEFAULT);
-
-        return convertBytes2Bimap(buffer);
+    public static Bitmap str2Bitmap(String base64) {
+        if (TextUtils.isEmpty(base64)) return null;
+        if (base64.contains(",")) base64 = base64.split(",")[1];
+        byte[] buffer = Base64.decode(base64, Base64.DEFAULT);
+        return bytes2Bitmap(buffer);
     }
 
-    /**
-     * bitmap转为base64
-     *
-     * @param bitmap
-     * @return
-     */
     public static String bitmapToBase64(Bitmap bitmap) {
 
         String result = null;
@@ -240,124 +231,58 @@ public class Cache {
         return result;
     }
 
-    // 拷贝assets下的资源文件到SD卡中(可以超过1M)
-    public static void copyBigDataToSD(String assetsFileName,
-                                       String strOutFileName) throws IOException {
-        File outFile = new File(strOutFileName);
-        if (outFile.isFile() && outFile.exists())
-            outFile.delete();
-        InputStream myInput;
-        OutputStream myOutput = new FileOutputStream(strOutFileName);
-        myInput = context.getAssets().open(assetsFileName);
-        byte[] buffer = new byte[1024];
-        int length = myInput.read(buffer);
-        while (length > 0) {
-            myOutput.write(buffer, 0, length);
-            length = myInput.read(buffer);
+    public static boolean copyBigDataToSD(String assetsFileName,
+                                          String strOutFileName) throws IOException {
+        if (!FileUtils.createFileByDeleteOldFile(strOutFileName)) return false;
+        InputStream myInput = null;
+        OutputStream myOutput = null;
+        try {
+            myOutput = new FileOutputStream(strOutFileName);
+            myInput = context.getAssets().open(assetsFileName);
+            byte[] buffer = new byte[1024];
+            int length = myInput.read(buffer);
+            while (length > 0) {
+                myOutput.write(buffer, 0, length);
+                length = myInput.read(buffer);
+            }
+            myOutput.flush();
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (myInput != null)
+                    myInput.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                if (myOutput != null)
+                    myOutput.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-
-        myOutput.flush();
-        myInput.close();
-        myOutput.close();
+        return false;
     }
 
-    public static String StringFilter(String str) {
-        // 只允许字母和数字
-        // String regEx = "[^a-zA-Z0-9]";
-        // 清除掉所有特殊字符
+    // 清除掉所有特殊字符，只允许字母和数字
+    // String regEx = "[^a-zA-Z0-9]";
+    public static String stringFilter(String str) {
         String regEx = "[`~!@#$%^&*()+=|{}':;',\\[\\]<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
         Pattern p = Pattern.compile(regEx);
         Matcher m = p.matcher(str);
         return m.replaceAll("").trim();
     }
 
-    /**
-     * 解压缩一个文件
-     *
-     * @param zipFile    要解压的压缩文件
-     * @param folderPath 解压缩的目标目录
-     * @throws IOException 当解压缩过程出错时抛出
-     */
-    public static void unZipFile(File zipFile, String folderPath)
-            throws ZipException, IOException {
-        if (!zipFile.exists())
-            return;
-        File desDir = new File(folderPath);
-        if (!desDir.exists()) {
-            desDir.mkdirs();
-        }
-
-        ZipFile zf = new ZipFile(zipFile);
-        for (Enumeration<?> entries = zf.entries(); entries.hasMoreElements(); ) {
-            ZipEntry entry = ((ZipEntry) entries.nextElement());
-            InputStream in = zf.getInputStream(entry);
-            String str = folderPath + File.separator + entry.getName();
-            str = new String(str.getBytes("8859_1"), "GB2312");
-            File desFile = new File(str);
-            if (!desFile.exists()) {
-                File fileParentDir = desFile.getParentFile();
-                if (!fileParentDir.exists()) {
-                    fileParentDir.mkdirs();
-                }
-                Log.d(TAG, "desFile.getPath : " + desFile.getPath());
-                desFile.createNewFile();
-            } else if (desFile.isFile()) {
-                desFile.delete();
-            }
-            OutputStream out = new FileOutputStream(desFile);
-            byte buffer[] = new byte[1024];
-            int realLength;
-            while ((realLength = in.read(buffer)) > 0) {
-                out.write(buffer, 0, realLength);
-            }
-            in.close();
-            out.close();
-        }
+    public static boolean createRootDir() {
+        return FileUtils.createFile(new File(rootName, ".nomedia"));
     }
 
-    /**
-     * 解压缩一个文件
-     *
-     * @param zipFile      要解压的压缩文件
-     * @param relativePath 解压缩的目标目录
-     * @throws IOException 当解压缩过程出错时抛出
-     */
-    public static void unZipFileFromRelativePath(File zipFile,
-                                                 String relativePath) throws ZipException, IOException {
-        createDir(relativePath);
-        unZipFile(zipFile, getRealFilePath(relativePath));
-    }
-
-    public static void unZipFileToCurrentPath(String zipFilePath) throws ZipException, IOException {
-        File zipFile = new File(zipFilePath);
-        unZipFile(zipFile, zipFile.getParent());
-    }
-
-    public static String createDir(String name) {
-        createRootDir();
-        return createDir(rootName, name);
-    }
-
-    public static String createDir(String[] name) {
-        createRootDir();
-        return createDir(rootName, name);
-    }
-
-    public static void createRootDir() {
+    public static boolean hasCreateRootDir() {
         File rootFile = new File(rootName);
-        if (!rootFile.exists() || !rootFile.isDirectory()) {
-            try {
-                rootFile.mkdirs();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            try {
-                new File(rootName, ".nomedia").createNewFile();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+        File noMediaFile = new File(rootName, ".nomedia");
+        return rootFile.exists() && rootFile.isDirectory() && noMediaFile.exists();
     }
 
     /**
@@ -376,43 +301,6 @@ public class Cache {
         return dataDir;
     }
 
-    /**
-     * @param name CloudPath
-     */
-    private static String createDir(String path, String name) {
-        if (TextUtils.isEmpty(path) || TextUtils.isEmpty(name))
-            return null;
-        if (path.endsWith(File.separator))
-            path = path.substring(0, path.length() - 1);
-        if (name.startsWith(File.separator))
-            name = name.substring(1);
-        if (name.endsWith(File.separator))
-            name = name.substring(0, name.length() - 1);
-
-        return createDir(path, name.split(File.separator));
-
-    }
-
-    private static String createDir(String path, String[] names) {
-        if (names == null || names.length == 0)
-            return path;
-        File file = new File(path);
-        if (!file.exists()) {
-            if (!file.mkdirs())
-                return null;
-        }
-        for (String dir_name : names) {
-            path += File.separator + dir_name;
-            file = new File(path);
-            if (!file.exists()) {
-                if (!file.mkdirs()) {
-                    return null;
-                }
-            }
-        }
-        return path;
-    }
-
     public static String getRealFilePath(String path) {
         createRootDir();
         if (path.startsWith(File.separator))
@@ -421,22 +309,98 @@ public class Cache {
             return Cache.rootName + File.separator + path;
     }
 
-    public static String getRealFilePath(String[] cacheName) {
-
-        String pathename = rootName;
-        if (cacheName != null) {
-            int i, length = cacheName.length;
-            for (i = 0; i < length; i++) {
-                pathename += File.separator + cacheName[i];
+    public static String getRealFilePath(String[] dirName) {
+        StringBuilder path = new StringBuilder(rootName);
+        if (dirName != null) {
+            for (String name : dirName) {
+                path.append(File.separator).append(name);
             }
         }
-
-        return pathename;
+        return path.toString();
     }
 
     public static boolean hasSDCard() {
         return Environment.getExternalStorageState() != null
                 && !Environment.getExternalStorageState().equals("removed");
+    }
+
+    public static String createGalleryFile(String fileName) {
+//        String filePath = Environment.getExternalStorageDirectory()
+//                + File.separator + Environment.DIRECTORY_DCIM + File.separator;
+//        if ("Xiaomi".equalsIgnoreCase(Build.BRAND)) {
+//            filePath += "Camera" + File.separator;
+//        }
+//        filePath += fileName;
+        String filePath = Environment.getExternalStorageDirectory()
+                + File.separator + Environment.DIRECTORY_DCIM
+                + File.separator + "Camera"
+                + File.separator + fileName;
+        File galleryDir = new File(filePath).getParentFile();
+        if (!galleryDir.exists()) {
+            try {
+                galleryDir.mkdirs();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return filePath;
+    }
+
+    public static boolean saveToGallery(Bitmap bitmap, String fileName) {
+        return saveToGallery(bitmap, fileName, 100);
+    }
+
+    public static boolean saveToGallery(Bitmap bitmap, String fileName, int quality) {
+        if (bitmap == null) return false;
+        String filePath = createGalleryFile(fileName);
+
+        Cache cache = getInstance();
+        try {
+            if (cache.initWrite(filePath, false)
+                    && cache.writeBitmap(bitmap, Bitmap.CompressFormat.PNG, quality)) {
+//                try {
+//                    MediaStore.Images.Media.insertImage(context.getContentResolver(),
+//                            filePath, fileName, null);
+//                } catch (FileNotFoundException e) {
+//                    e.printStackTrace();
+//                }
+                FileUtils.notifySystemToScan(filePath);
+                return true;
+            }
+        } finally {
+            cache.saveWrite();
+        }
+        return false;
+    }
+
+    public static String getDataFromAsset(Context context, String fileName) {
+        StringBuilder stringBuilder = new StringBuilder();
+        try {
+            AssetManager assetManager = context.getAssets();
+            BufferedReader bf = new BufferedReader(new InputStreamReader(
+                    assetManager.open(fileName)));
+            String line;
+            while ((line = bf.readLine()) != null) {
+                stringBuilder.append(line);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return stringBuilder.toString();
+    }
+
+    public static void tryRecycleAnimationDrawable(AnimationDrawable animationDrawable) {
+        if (animationDrawable != null) {
+            animationDrawable.stop();
+            for (int i = 0; i < animationDrawable.getNumberOfFrames(); i++) {
+                Drawable frame = animationDrawable.getFrame(i);
+                if (frame instanceof BitmapDrawable) {
+                    ((BitmapDrawable) frame).getBitmap().recycle();
+                }
+                frame.setCallback(null);
+            }
+            animationDrawable.setCallback(null);
+        }
     }
 
     private boolean initReadStream() {
@@ -445,50 +409,27 @@ public class Cache {
         return (dis != null);
     }
 
-    public boolean initRead(String file_path) {
-        File f;
-        boolean isHaveSDCard = false;
-        if (Environment.getExternalStorageState() != null
-                && !Environment.getExternalStorageState().equals("removed")) {
-            isHaveSDCard = true;
-        }
-
-        try {
-            if (isHaveSDCard) {
-                f = new File(file_path);
-                if (f == null || !f.exists()) {
-                    return false;
-                }
-                fis = new FileInputStream(f);
-            } else {
-                fis = context.openFileInput(file_path);
-            }
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return false;
-        }
-
-        return (fis != null);
-
+    public boolean initRead(String filePath) {
+        return initRead(new File(filePath));
     }
 
     public boolean initRead(String pathName, String fileName) {
-        return initRead(pathName + File.separator + fileName);
+        return initRead(new File(pathName, fileName));
     }
 
     public boolean initRead(String[] cacheName, String fileName) {
+        return initRead(getFile(cacheName, fileName));
+    }
+
+    public boolean initRead(File file) {
         try {
             if (hasSDCard()) {
-                File file = getFile(cacheName, fileName);
-                Log.d(TAG, "initRead:" + file.getPath());
-                Log.d(TAG, "initRead:" + file.exists());
-                if (!file.exists()) {
+                if (!file.exists() || file.isDirectory()) {
                     return false;
                 }
                 fis = new FileInputStream(file);
             } else {
-                fis = context.openFileInput(fileName);
+                fis = context.openFileInput(FileUtils.getFileName(file));
             }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -496,7 +437,6 @@ public class Cache {
         }
 
         return (fis != null);
-
     }
 
     public int readInt(int a) {
@@ -613,121 +553,27 @@ public class Cache {
         return (dos != null);
     }
 
-    public boolean initWrite(String file_path, boolean isSupple) {
-        File f;
-
-        try {
-            if (Environment.getExternalStorageState() != null
-                    && !Environment.getExternalStorageState().equals("removed")) {
-
-                f = new File(file_path);
-
-                File parent_file = f.getParentFile();
-                if (!parent_file.exists()) {
-                    if (!parent_file.mkdirs())
-                        return false;
-                }
-
-                if (!f.exists()) {
-                    Log.d(TAG, "create New File");
-                    if (!f.createNewFile())
-                        return false;
-                }
-                fos = new FileOutputStream(f, isSupple);
-            } else {
-                if (isSupple)
-                    fos = context
-                            .openFileOutput(file_path, Context.MODE_APPEND);
-                else
-                    fos = context.openFileOutput(file_path,
-                            Context.MODE_PRIVATE);
-            }
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return false;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-
-        return (fos != null);
+    public boolean initWrite(String filePath) {
+        return initWrite(filePath, false);
     }
 
-    public boolean initWrite(String pathName, String fileName, boolean isSupple) {
-        File f;
-
-        try {
-            if (Environment.getExternalStorageState() != null
-                    && !Environment.getExternalStorageState().equals("removed")) {
-
-                File path = new File(pathName);
-                if (!path.exists()) {
-                    if (!path.mkdirs())
-                        return false;
-                }
-
-                f = new File(pathName + File.separator + fileName);
-
-                if (!f.exists()) {
-                    Log.d(TAG, "create New File");
-                    if (!f.createNewFile())
-                        return false;
-                }
-                fos = new FileOutputStream(f, isSupple);
-            } else {
-                if (isSupple)
-                    fos = context.openFileOutput(fileName, Context.MODE_APPEND);
-                else
-                    fos = context
-                            .openFileOutput(fileName, Context.MODE_PRIVATE);
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return false;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-
-        return (fos != null);
+    public boolean initWrite(String parentPath, String fileName, boolean isSupple) {
+        return initWrite(new File(parentPath, fileName).getPath(), isSupple);
     }
 
-    public boolean initWrite(String[] cacheName, String fileName,
-                             boolean isSupple) {
-        File f;
+    public boolean initWrite(String filePath, boolean isSupple) {
         try {
-            if (Environment.getExternalStorageState() != null
-                    && !Environment.getExternalStorageState().equals("removed")) {
-
-                createRootDir();
-
-                String pathName = createDir(rootName, cacheName);
-                if (pathName == null)
-                    return false;
-
-                f = new File(pathName + File.separator + fileName);
-
-                if (!f.exists()) {
-                    Log.d(TAG, "create New File : " + f.getPath());
-                    f.createNewFile();
-                }
-                fos = new FileOutputStream(f, isSupple);
+            if (hasSDCard()) {
+                if (!FileUtils.createFile(filePath)) return false;
+                fos = new FileOutputStream(new File(filePath), isSupple);
             } else {
-                if (isSupple)
-                    fos = context.openFileOutput(fileName, Context.MODE_APPEND);
-                else
-                    fos = context
-                            .openFileOutput(fileName, Context.MODE_PRIVATE);
+                fos = context.openFileOutput(FileUtils.getFileName(filePath),
+                        isSupple ? Context.MODE_APPEND : Context.MODE_PRIVATE);
             }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return false;
         } catch (IOException e) {
             e.printStackTrace();
             return false;
         }
-
         return (fos != null);
     }
 
@@ -788,16 +634,19 @@ public class Cache {
     }
 
     public boolean writeBitmap(Bitmap bitmap, Bitmap.CompressFormat format) {
-        try {
-            if (!bitmap.compress(format, 100, fos))
-                return false;
+        return writeBitmap(bitmap, format, 100);
+    }
 
+    public boolean writeBitmap(Bitmap bitmap, Bitmap.CompressFormat format, int quality) {
+        try {
+            if (!bitmap.compress(format, quality, fos))
+                return false;
             fos.flush();
-        } catch (IOException e) {
+            return true;
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
-        return true;
+        return false;
     }
 
     public boolean writeWhiteBitmap(int width, int height) {
@@ -822,9 +671,13 @@ public class Cache {
         try {
             if (fos != null)
                 fos.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
             if (dos != null)
                 dos.close();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -838,5 +691,4 @@ public class Cache {
         initReadStream();
         return dis;
     }
-
 }

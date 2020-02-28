@@ -32,12 +32,20 @@ public class StatusBarUtils {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = activity.getWindow();
             window.setStatusBarColor(colorId);
+            window.setNavigationBarColor(colorId);
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             //使用SystemBarTintManager,需要先将状态栏设置为透明
             setTranslucentStatus(activity);
             SystemBarTintManager systemBarTintManager = new SystemBarTintManager(activity);
             systemBarTintManager.setStatusBarTintEnabled(true);//显示状态栏
             systemBarTintManager.setStatusBarTintColor(colorId);//设置状态栏颜色
+        }
+    }
+
+    public static void setNavigationBarColor(Activity activity, int colorId) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = activity.getWindow();
+            window.setNavigationBarColor(colorId);
         }
     }
 
@@ -57,7 +65,7 @@ public class StatusBarUtils {
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.setStatusBarColor(Color.TRANSPARENT);
             //导航栏颜色也可以正常设置
-            //window.setNavigationBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.BLACK);
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             Window window = activity.getWindow();
             WindowManager.LayoutParams attributes = window.getAttributes();

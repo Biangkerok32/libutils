@@ -8,8 +8,11 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 
 /**
  * Created by xuqiqiang on 2019/09/24.
@@ -63,5 +66,25 @@ public final class ImageUtils {
         }
 //        bm.recycle();
         return bit;
+    }
+
+    public static Bitmap drawable2Bitmap(Drawable drawable) {
+        if (drawable == null) return null;
+        if (drawable instanceof BitmapDrawable) return ((BitmapDrawable) drawable).getBitmap();
+        int w = drawable.getIntrinsicWidth();
+        int h = drawable.getIntrinsicHeight();
+
+        Bitmap.Config config = drawable.getOpacity() != PixelFormat.OPAQUE ? Bitmap.Config.ARGB_8888
+                : Bitmap.Config.RGB_565;
+        try {
+            Bitmap bitmap = Bitmap.createBitmap(w, h, config);
+            Canvas canvas = new Canvas(bitmap);
+            drawable.setBounds(0, 0, w, h);
+            drawable.draw(canvas);
+            return bitmap;
+        } catch (OutOfMemoryError error) {
+            error.printStackTrace();
+        }
+        return null;
     }
 }

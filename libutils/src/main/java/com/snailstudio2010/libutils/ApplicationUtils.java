@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.util.Log;
 
 /**
  * Created by xuqiqiang on 2016/05/17.
@@ -27,15 +28,19 @@ public class ApplicationUtils {
     }
 
     public static String getVersionName(Context context) {
-        String versionName = "Unknown";
+
+        //获取包管理器
+        PackageManager pm = context.getPackageManager();
+        //获取包信息
         try {
-            versionName = context.getPackageManager().getPackageInfo(
-                    context.getPackageName(), 0).versionName;
-        } catch (NameNotFoundException e) {
+            PackageInfo packageInfo = pm.getPackageInfo(context.getPackageName(), 0);
+            //返回版本号
+            return packageInfo.versionName;
+        } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
-            // Just leave the versionName to be "Unknown"
         }
-        return versionName;
+
+        return null;
     }
 
     public static String getApplicationMetaData(Context context, String key) {
@@ -74,4 +79,19 @@ public class ApplicationUtils {
         }
         return 0;
     }
+
+
+    public static boolean isAppInstalled(Context context, String pkg_name,
+                                         int version) {
+        PackageInfo packageInfo = null;
+        try {
+            packageInfo = context.getPackageManager().getPackageInfo(pkg_name,
+                    0);
+            Log.d("ApplicationUtils", packageInfo.versionCode + "");
+        } catch (NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        return packageInfo != null && version <= packageInfo.versionCode;
+    }
+
 }

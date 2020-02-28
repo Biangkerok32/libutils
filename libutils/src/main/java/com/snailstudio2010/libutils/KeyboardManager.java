@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 
 /**
  * Created by xuqiqiang on 2016/05/17.
@@ -36,6 +37,10 @@ public class KeyboardManager {
         return this;
     }
 
+    public boolean hiddenKeyboard() {
+        return hiddenKeyboard(context.getWindow().getDecorView());
+    }
+
     public boolean hiddenKeyboard(View view) {
         if (mInputMethodManager != null && view != null)
             return mInputMethodManager.hideSoftInputFromWindow(view.getWindowToken(), 0);// InputMethodManager.HIDE_NOT_ALWAYS);
@@ -43,6 +48,11 @@ public class KeyboardManager {
     }
 
     public void showKeyboard(final View view) {
+        if (view instanceof EditText) {
+            view.setFocusable(true);
+            view.setFocusableInTouchMode(true);
+            view.requestFocus();
+        }
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {

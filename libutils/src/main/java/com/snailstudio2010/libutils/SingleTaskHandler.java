@@ -39,6 +39,13 @@ public class SingleTaskHandler extends Handler {
         return postDelayed(mTask, delayMillis);
     }
 
+    public final void removeTask() {
+        if (mTask != null) {
+            removeCallbacks(mTask);
+            mTask = null;
+        }
+    }
+
     public Runnable postTask(final Runnable r, final long delayMillis) {
         return new Runnable() {
             @Override
